@@ -1,0 +1,1 @@
+ALTER TABLE `kopdes_orders` ADD `completed_at` integer;

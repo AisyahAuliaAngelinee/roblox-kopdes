@@ -1,0 +1,60 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {Miniflare} from 'miniflare';
+import {insertOrder,readOrder,listOrders,markPaid,completeOrder} from '../db/order-store.ts';
+import {deliveryStage} from '../lib/order-types.ts';
+const mf=new Miniflare({modules:true,script:'export default {fetch(){return new Response("ok")}}',compatibilityDate:'2026-05-15',d1Databases:{DB:'test-orders'}});
+try{
+ const db=await mf.getD1Database('DB');
+ const migration=await fs.readFile('drizzle/0001_chief_warhawk.sql','utf8');for(const s of migration.split('--> statement-breakpoint'))await db.exec(s.replace(/\n/g,' '));
+ await db.exec((await fs.readFile('drizzle/0002_sad_marvel_apes.sql','utf8')).replace(/\n/g,' '));
+ const data={mode:'demo',email:null,items:[{id:'telur',name:'Telur',price:28000,quantity:2}],amount:56000,shipping:0,address:{city:'Jakarta'}};
+ await insertOrder(db,'a','order-a',data);await insertOrder(db,'b','order-b',data);
+ assert.equal(await readOrder(db,'b','order-a'),null);assert.equal((await listOrders(db,'a')).length,1);
+ await db.prepare("UPDATE kopdes_orders SET status='PENDING' WHERE id='order-a'").run();
+ await markPaid(db,'b','order-a',1000);assert.equal((await readOrder(db,'a','order-a')).paidAt,null);
+ await markPaid(db,'a','order-a',1000);await markPaid(db,'a','order-a',5000);assert.equal((await readOrder(db,'a','order-a')).paidAt,1000);
+ assert.equal(deliveryStage(null,100000),-1);assert.equal(deliveryStage(1000,1000),0);assert.equal(deliveryStage(1000,30999),0);assert.equal(deliveryStage(1000,31000),1);assert.equal(deliveryStage(1000,121000),2);
+ await completeOrder(db,'a','order-a',120999);assert.equal((await readOrder(db,'a','order-a')).status,'PAID');
+ await completeOrder(db,'b','order-a',121000);assert.equal((await readOrder(db,'a','order-a')).status,'PAID');
+ await completeOrder(db,'a','order-a',121000);assert.equal((await readOrder(db,'a','order-a')).status,'COMPLETED');
+ await completeOrder(db,'a','order-a',999999);assert.equal((await readOrder(db,'a','order-a')).completedAt,121000);
+ console.log('PASS: completion guard, ownership and idempotency; durable orders, ownership isolation, idempotent payment timestamp, delivery boundaries.');
+}finally{await mf.dispose();}
+
+const mf2=new Miniflare({modules:true,script:'export default {fetch(){return new Response("ok")}}',compatibilityDate:'2026-05-15',d1Databases:{DB:'test-history-search'}});
+try{
+ const {activeOrderCount,searchOrders,expireDemoOrders,payDemoOrder}=await import('../db/order-store.ts');
+ const db=await mf2.getD1Database('DB');
+ for(const path of ['drizzle/0001_chief_warhawk.sql','drizzle/0002_sad_marvel_apes.sql'])for(const s of (await fs.readFile(path,'utf8')).split('--> statement-breakpoint'))await db.exec(s.replace(/\n/g,' '));
+ const data={mode:'demo',items:[{id:'telur',name:'Telur',price:28000,quantity:1}],amount:28000,shipping:0,address:{recipient:'Penerima Test'},deliveryMethod:'express'};
+ for(let i=0;i<52;i++)await insertOrder(db,'a','express-'+i,data);
+ await insertOrder(db,'b','private-order',data);
+ assert.equal(await activeOrderCount(db,'a'),52);
+ let page=await searchOrders(db,'a','Telur','ACTIVE','express',0);assert.equal(page.orders.length,50);assert.equal(page.hasMore,true);
+ page=await searchOrders(db,'a','Telur','ACTIVE','express',50);assert.equal(page.orders.length,2);assert.equal(page.hasMore,false);
+ assert.equal((await searchOrders(db,'a','private-order','','',0)).orders.length,0);
+ assert.equal((await searchOrders(db,'a','%','','',0)).orders.length,0);
+ await db.prepare("UPDATE kopdes_orders SET status='PAID', paid_at=1000 WHERE id='express-0'").run();
+ await completeOrder(db,'a','express-0',60999,60000);assert.equal((await readOrder(db,'a','express-0')).status,'PAID');
+ await completeOrder(db,'a','express-0',61000,60000);assert.equal(await activeOrderCount(db,'a'),51);
+ assert.equal((await searchOrders(db,'a','','COMPLETED','express',0)).orders.length,1);
+ assert.equal(deliveryStage(1000,15999,'express'),0);assert.equal(deliveryStage(1000,16000,'express'),1);assert.equal(deliveryStage(1000,61000,'express'),2);
+ const {dateBoundary}=await import('../lib/order-types.ts');
+ assert.ok(Number.isNaN(dateBoundary('2026-02-30')));assert.equal(dateBoundary('2026-09-26'),Date.parse('2026-09-25T17:00:00Z'));
+ const start=dateBoundary('2026-09-26');
+ await db.prepare("UPDATE kopdes_orders SET created_at=? WHERE id='express-1'").bind(start).run();
+ await db.prepare("UPDATE kopdes_orders SET created_at=? WHERE id='express-2'").bind(start+86400000).run();
+ const dated=await searchOrders(db,'a','express-1','','',0,start,start+86400000);
+ assert.ok(dated.orders.some(o=>o.id==='express-1'));assert.equal((await searchOrders(db,'a','express-2','','',0,start,start+86400000)).orders.some(o=>o.id==='express-2'),false);
+ await insertOrder(db,'a','expired',{...data,expiresAt:5000});await insertOrder(db,'a','valid',{...data,expiresAt:5001});await insertOrder(db,'a','provider',{...data,mode:'xendit-test',expiresAt:5000});
+ await db.prepare("UPDATE kopdes_orders SET status='PENDING' WHERE id IN ('expired','valid','provider')").run();
+ await payDemoOrder(db,'a','expired',5000);assert.equal((await readOrder(db,'a','expired')).status,'PENDING');
+ await payDemoOrder(db,'b','valid',5000);assert.equal((await readOrder(db,'a','valid')).status,'PENDING');
+ await payDemoOrder(db,'a','valid',5000);assert.equal((await readOrder(db,'a','valid')).status,'PAID');
+ await expireDemoOrders(db,'a',5000);assert.equal((await readOrder(db,'a','expired')).status,'EXPIRED');assert.equal((await readOrder(db,'a','provider')).status,'PENDING');
+ await db.prepare("UPDATE kopdes_orders SET status='FAILED' WHERE id='express-3'").run();
+ assert.equal((await searchOrders(db,'a','','UNSUCCESSFUL','',0)).orders.length,2);
+ console.log('PASS: date boundaries WIB, invalid dates, grouped failure statuses, expiration boundary, expired payment rejection and provider status preservation.');
+ console.log('PASS: Express timing, active badge count beyond 50, status/shipping/search filters, literal query handling, pagination and account isolation.');
+}finally{await mf2.dispose();}
