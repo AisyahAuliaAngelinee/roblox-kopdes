@@ -1,5 +1,5 @@
 import {Xendit} from 'xendit-node';
-import {products} from '@/lib/catalog';
+import {readProducts} from '@/db/managed-store';
 import {addressSchema} from '@/lib/profile';
 import {sameOrigin,json} from '@/lib/auth';
 import {orderOwner} from '@/lib/order-owner';
@@ -11,7 +11,7 @@ export async function POST(request:Request){
  try{
  const identity=await orderOwner(request);
  if(!identity.user||!identity.owner)return json({error:'Masuk dengan Google sebelum checkout agar invoice menggunakan email akun Anda.',code:'LOGIN_REQUIRED'},401);
- const body:any=await request.json();const address=addressSchema.safeParse(body.address);
+ const products=await readProducts(getDb());const body:any=await request.json();const address=addressSchema.safeParse(body.address);
  if(!['express','regular'].includes(body.deliveryMethod))return json({error:'Pilih pengiriman Express atau Regular.'},400);
  if(!['qris','gopay','bank'].includes(body.paymentMethod))return json({error:'Pilih metode pembayaran.'},400);
  if(body.paymentMethod==='bank'&&!['BCA','BRI','MANDIRI','BNI','PERMATA'].includes(body.bankCode))return json({error:'Pilih bank yang tersedia.'},400);
@@ -19,7 +19,7 @@ export async function POST(request:Request){
  if(!address.success)return json({error:'Simpan alamat pengantaran yang lengkap terlebih dahulu.'},400);
  if(!Array.isArray(body.items)||!body.items.length||body.items.length>products.length)return json({error:'Keranjang tidak valid.'},400);
  const items:OrderData['items']=[];const seen=new Set<string>();
- for(const item of body.items){const p=products.find(p=>p.id===item.id);if(!p||seen.has(p.id)||!Number.isInteger(item.quantity)||item.quantity<1||item.quantity>p.stock)return json({error:'Produk atau jumlah tidak valid.'},400);seen.add(p.id);items.push({id:p.id,name:p.name,price:p.price,quantity:item.quantity});}
+ for(const item of body.items){const p=products.find(p=>p.id===item.id);if(!p||seen.has(p.id)||!Number.isInteger(item.quantity)||item.quantity<1||item.quantity>p.stock)return json({error:'Produk atau jumlah tidak valid.'},400);seen.add(p.id);items.push({id:p.id,name:p.name,category:p.category,price:p.price,quantity:item.quantity});}
  const secret=process.env.XENDIT_SECRET_KEY;
  if(secret&&!identity.user)return json({error:'Masuk dengan Google untuk menerima invoice Xendit di email akun Anda.'},401);
  if(secret&&!secret.startsWith('xnd_development_'))return json({error:'Prototipe hanya menerima kunci Xendit Test.'},503);

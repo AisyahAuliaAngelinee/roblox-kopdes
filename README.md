@@ -107,3 +107,17 @@ Harga, stok, trending, dan pengiriman merupakan contoh. Proyek belum ditujukan u
 Kode proyek dilisensikan dengan [MIT License](LICENSE), Copyright © 2026 Vincentius Clarishna.
 
 Logo, merek, kemasan produk, foto, dan tangkapan layar Roblox dapat memiliki hak terpisah milik pemiliknya. Lisensi MIT kode tidak memberikan hak atas merek atau aset pihak ketiga tersebut. Sumber gambar katalog tercatat di `public/catalog/sources.json` bila tersedia. Dependency mengikuti lisensinya masing-masing.
+
+## Mode admin internal
+
+Area admin tersedia di `/admin`, login di `/admin/login`, dan pendaftaran di `/admin/register`. Akun admin terpisah dari login Google pelanggan. Semua API admin memeriksa sesi server; pelanggan dan tamu tidak diberi hak admin.
+
+- Set secret server `ADMIN_INVITE_CODE` berupa nilai acak minimal 32 karakter untuk undangan pertama. Undangan pertama berlaku 7 hari sejak percobaan pendaftaran pertama dan hanya dapat dikonsumsi satu kali. Tidak ada akun/password bawaan.
+- Admin yang sudah masuk dapat membuat kode undangan baru (24 jam, sekali pakai). Setiap admin memiliki hak pengelolaan toko dan undangan; hanya bagikan kepada staf berwenang.
+- Password disimpan sebagai hash PBKDF2-SHA256 dengan salt acak. Sesi opaque disimpan sebagai hash, kedaluwarsa 8 jam, cookie HttpOnly/SameSite dan Secure di HTTPS. Logout mencabut sesi. Login/register dibatasi per email dan alamat IP.
+- Produk disimpan di D1: tambah item, ubah harga/gambar/kategori, tambah atau set stok, tandai stok kosong dan trending. Stok dikelola manual; prototipe belum melakukan reservasi/pengurangan stok otomatis saat pesanan dibayar.
+- Editor karyawan mendukung peran/nama/deskripsi/gambar (URL HTTPS atau aset lokal), urutan dan visibilitas. Upload file baru belum tersedia.
+- Grafik garis di beranda admin menampilkan 30 hari WIB, berdasarkan jumlah unit di pesanan PAID/COMPLETED. Data demo dan Xendit Test dipisahkan; tidak ada transaksi live. Kategori disalin pada checkout baru; pesanan lama memakai kategori katalog terkini sebagai fallback.
+- Katalog publik diperbarui tiap 30 detik atau saat tab kembali aktif. Checkout memakai harga dan stok server terkini. Penyimpanan memakai versi untuk menolak pembaruan dari tab lama.
+
+Terapkan migrasi `0004_clammy_magus.sql` untuk database lokal. Pengujian integrasi admin: jalankan server lokal, lalu `node tests/admin-api.mjs`. Pengujian ini membuat fixture akun/produk/pesanan hanya pada D1 lokal. Jangan jalankan terhadap produksi. Untuk lokal, isi `ADMIN_INVITE_CODE` di `.env` dan `.dev.vars`; kode untuk produksi harus berbeda.

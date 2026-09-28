@@ -1,0 +1,6 @@
+import {z} from 'zod';
+export const imageUrl=z.string().max(2000).refine(s=>/^\/(?!\/)[a-zA-Z0-9/_ .%-]+$/.test(s)||(()=>{try{const u=new URL(s);return u.protocol==='https:'&&!u.username&&!u.password;}catch{return false;}})(),'Gunakan path gambar lokal atau URL HTTPS.');
+export const productSchema=z.object({id:z.string().regex(/^[a-z0-9-]{1,80}$/),name:z.string().trim().min(2).max(100),category:z.enum(['Sembako','Sayur & Buah','Minuman','Camilan & Sereal','Rumah Tangga','Perawatan Diri','Kebutuhan Bayi']),unit:z.string().trim().min(1).max(40),price:z.number().int().min(1).max(100000000),stock:z.number().int().min(0).max(100000),origin:z.string().trim().min(1).max(80),image:imageUrl,tag:z.string().trim().max(50),packaged:z.boolean(),trending:z.boolean()}).strict();
+export const staffSchema=z.object({id:z.string().regex(/^[a-z0-9-]{1,80}$/),role:z.string().trim().min(2).max(80),name:z.string().trim().max(80),description:z.string().trim().max(300),image:imageUrl,active:z.boolean()}).strict();
+export type Staff= z.infer<typeof staffSchema>;
+export const initialStaff:Staff[]=[{id:'manager-toko',role:'Manager Toko'},{id:'stock-gudang',role:'Stock Gudang'},{id:'kasir',role:'Kasir'},{id:'kebersihan',role:'Tukang Kebersihan'},{id:'stock-rak',role:'Stock Rak'}].map(s=>({...s,name:'',description:'',image:'/karyawan/'+s.id+'.png',active:true}));

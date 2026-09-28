@@ -1,5 +1,5 @@
 import imageFiles from './catalog-images.json';
-export type Product={id:string;name:string;category:string;unit:string;price:number;origin:string;image:string;tag:string;stock:number;packaged:boolean};
+export type Product={id:string;name:string;category:string;unit:string;price:number;origin:string;image:string;tag:string;stock:number;packaged:boolean;trending:boolean};
 const items:[string,string,string,string,number,string,boolean][]=[
  ['mie-instan','Mie Instan','Sembako','1 bungkus',3500,'https://i.ebayimg.com/images/g/19sAAOSwJppmbW~R/s-l1200.jpg',true],
  ['daun-serai','Daun Serai','Sayur & Buah','1 ikat',5000,'https://down-id.img.susercontent.com/file/fb5ea56c79356beb7123e7a5ff4a085f',false],
@@ -33,5 +33,5 @@ const items:[string,string,string,string,number,string,boolean][]=[
  ['bebelove','Bebelove','Kebutuhan Bayi','800 g',135000,'https://tokokamas.id/storage/app/public/product/2026-01-07-695e11b5546d1.webp',true],
 ];
 export const categories=['Semua Produk','Sembako','Sayur & Buah','Minuman','Camilan & Sereal','Rumah Tangga','Perawatan Diri','Kebutuhan Bayi'];
-export const products:Product[]=items.map(([id,name,category,unit,price,image,packaged])=>({id,name,category,unit,price,image:(imageFiles as Record<string,string>)[id]||image,packaged,origin:category==='Sayur & Buah'?'Hasil Tani':'Gerai Koperasi',tag:category,stock:40}));
+export const products:Product[]=items.map(([id,name,category,unit,price,image,packaged])=>({id,name,category,unit,price,image:(imageFiles as Record<string,string>)[id]||image,packaged,origin:category==='Sayur & Buah'?'Hasil Tani':'Gerai Koperasi',tag:category,stock:40,trending:['mie-instan','telur','beras','minyak','indomilk','sunlight'].includes(id)}));
 export const rupiah=(n:number)=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n);
