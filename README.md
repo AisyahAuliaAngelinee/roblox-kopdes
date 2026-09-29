@@ -116,7 +116,7 @@ Area admin tersedia di `/admin`, login di `/admin/login`, dan pendaftaran di `/a
 - Admin yang sudah masuk dapat membuat kode undangan baru (24 jam, sekali pakai). Setiap admin memiliki hak pengelolaan toko dan undangan; hanya bagikan kepada staf berwenang.
 - Password disimpan sebagai hash PBKDF2-SHA256 dengan salt acak. Sesi opaque disimpan sebagai hash, kedaluwarsa 8 jam, cookie HttpOnly/SameSite dan Secure di HTTPS. Logout mencabut sesi. Login/register dibatasi per email dan alamat IP.
 - Produk disimpan di D1: tambah item, ubah harga/gambar/kategori, tambah atau set stok, tandai stok kosong dan trending. Stok dikelola manual; prototipe belum melakukan reservasi/pengurangan stok otomatis saat pesanan dibayar.
-- Editor karyawan mendukung peran/nama/deskripsi/gambar (URL HTTPS atau aset lokal), urutan dan visibilitas. Upload file baru belum tersedia.
+- Editor karyawan mendukung peran/nama/deskripsi/gambar, urutan dan visibilitas. Foto produk dan karyawan dapat diunggah dari perangkat atau diimpor dari URL HTTPS publik. Format PNG/JPG/JPEG, maksimal 12 MB per gambar; byte diperiksa di server, disimpan permanen di R2 `IMAGES`, dan baru ditayangkan setelah perubahan produk/karyawan disimpan. URL yang tidak dapat diambil menampilkan opsi untuk unggah file.
 - Grafik garis di beranda admin menampilkan 30 hari WIB, berdasarkan jumlah unit di pesanan PAID/COMPLETED. Data demo dan Xendit Test dipisahkan; tidak ada transaksi live. Kategori disalin pada checkout baru; pesanan lama memakai kategori katalog terkini sebagai fallback.
 - Katalog publik diperbarui tiap 30 detik atau saat tab kembali aktif. Checkout memakai harga dan stok server terkini. Penyimpanan memakai versi untuk menolak pembaruan dari tab lama.
 
