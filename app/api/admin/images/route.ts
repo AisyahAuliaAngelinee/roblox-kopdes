@@ -22,7 +22,7 @@ export async function POST(request:Request) {
    throw new ImageInputError('Pilih file PNG, JPG, atau JPEG.');
   }
   const bytes=await readImageBytes(body,length), format=imageType(bytes), key=crypto.randomUUID()+'.'+format.extension;
-  await imageStore().put(key,bytes,{httpMetadata:{contentType:format.type,cacheControl:'public, max-age=31536000, immutable'}});
+  await imageStore.put(key,bytes,format.type);
   return json({url:'/api/images/'+key,size:bytes.length},201);
  } catch(error) {
   if(error instanceof ImageInputError) return json({error:error.message},400);
