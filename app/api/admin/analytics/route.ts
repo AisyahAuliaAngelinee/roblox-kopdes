@@ -2,10 +2,18 @@ import {getDb} from '@/db';
 import {json} from '@/lib/auth';
 import {adminUser} from '@/lib/admin-auth';
 import {readProducts} from '@/db/managed-store';
-export async function GET(r:Request){try{if(!await adminUser(r))return json({error:'Login admin diperlukan.'},401);const db=getDb();await readProducts(db);const mode=new URL(r.url).searchParams.get('mode')==='xendit-test'?'xendit-test':'demo';const today=new Date(Date.now()+25200000).toISOString().slice(0,10);const end=Date.parse(today+'T00:00:00+07:00')+86400000;const start=end-30*86400000;
-const records=await db.prepare(`SELECT date(o.paid_at/1000,'unixepoch','+7 hours') day,json_extract(j.value,'$.id') id,json_extract(j.value,'$.name') name,COALESCE(json_extract(j.value,'$.category'),json_extract(p.data,'$.category'),'Lainnya') category,SUM(CAST(json_extract(j.value,'$.quantity') AS INTEGER)) quantity FROM kopdes_orders o JOIN json_each(o.data,'$.items') j LEFT JOIN kopdes_products p ON p.id=json_extract(j.value,'$.id') WHERE o.status IN ('PAID','COMPLETED') AND o.paid_at>=? AND o.paid_at<? AND json_extract(o.data,'$.mode')=? GROUP BY day,json_extract(j.value,'$.id'),json_extract(j.value,'$.name'),COALESCE(json_extract(j.value,'$.category'),json_extract(p.data,'$.category'),'Lainnya') ORDER BY day`).bind(start,end,mode).all<{day:string;id:string;name:string;category:string;quantity:number}>();
-const summary=await db.prepare("SELECT COUNT(*) orders,COALESCE(SUM(json_extract(data,'$.amount')),0) revenue FROM kopdes_orders WHERE status IN ('PAID','COMPLETED') AND paid_at>=? AND paid_at<? AND json_extract(data,'$.mode')=?").bind(start,end,mode).first();
-const inventoryAlerts=await db.prepare("SELECT id,json_extract(data,'$.inventoryShortages') shortages FROM kopdes_orders WHERE status='PAID' AND json_array_length(data,'$.inventoryShortages')>0 ORDER BY paid_at DESC LIMIT 20").all<{id:string;shortages:string}>();
-const pt=new Map<string,{id:string;name:string;quantity:number}>(),ct=new Map<string,number>();for(const row of records.results){const old=pt.get(row.id);pt.set(row.id,{id:row.id,name:row.name,quantity:(old?.quantity||0)+row.quantity});ct.set(row.category,(ct.get(row.category)||0)+row.quantity);}
-const topProducts=[...pt.values()].sort((a,b)=>b.quantity-a.quantity).slice(0,5),topCategories=[...ct].map(([name,quantity])=>({name,quantity})).sort((a,b)=>b.quantity-a.quantity).slice(0,5);
-const days=Array.from({length:30},(_,i)=>{const day=new Date(start+i*86400000+25200000).toISOString().slice(0,10);const rows=records.results.filter(r=>r.day===day);return {day,...Object.fromEntries(topProducts.map((p,i)=>['p'+i,rows.filter(r=>r.id===p.id).reduce((s,r)=>s+r.quantity,0)])),...Object.fromEntries(topCategories.map((c,i)=>['c'+i,rows.filter(r=>r.category===c.name).reduce((s,r)=>s+r.quantity,0)]))};});return json({mode,summary,inventoryAlerts:inventoryAlerts.results.map(r=>({id:r.id,items:JSON.parse(r.shortages)})),units:[...pt.values()].reduce((s,p)=>s+p.quantity,0),topProducts,topCategories,days});}catch(e){console.error('admin_analytics',e);return json({error:'Analytics belum dapat dimuat.'},503);}}
+import {aggregateAnalytics,periodBounds,type AnalyticsRow} from '@/lib/admin-analytics';
+export async function GET(r:Request){try{
+ if(!await adminUser(r))return json({error:'Login admin diperlukan.'},401);
+ const q=new URL(r.url).searchParams,mode=q.get('mode')==='xendit-test'?'xendit-test':'demo';
+ const options={period:q.get('period')||'last30',barPeriod:q.get('barPeriod')||'weekly',category:q.get('category')||'all',status:q.get('status')||'all',from:q.get('from'),to:q.get('to')};
+ if(!['last30','all','daily','weekly','monthly','yearly','range'].includes(options.period)||!['weekly','monthly','yearly'].includes(options.barPeriod)||!['all','completed','failed','shipping'].includes(options.status))return json({error:'Filter analytics tidak valid.'},400);
+ try{periodBounds(options.period,Date.now(),options.from,options.to);}catch(e){return json({error:(e as Error).message},400);}
+ const db=getDb();const products=await readProducts(db);
+ const records=await db.prepare("SELECT id,status,created_at,paid_at,data FROM kopdes_orders WHERE json_extract(data,'$.mode')=?").bind(mode).all<AnalyticsRow>();
+ // Old orders may predate the category snapshot; recover it from the current catalog.
+ const categoryById=new Map(products.map(p=>[p.id,p.category]));
+ const rows=records.results.map(o=>{const data=JSON.parse(o.data);data.items=data.items.map((i:any)=>({...i,category:i.category||categoryById.get(i.id)||'Lainnya'}));return {...o,data:JSON.stringify(data)};});
+ const inventoryAlerts=await db.prepare("SELECT id,json_extract(data,'$.inventoryShortages') shortages FROM kopdes_orders WHERE status='PAID' AND json_extract(data,'$.mode')=? AND json_array_length(data,'$.inventoryShortages')>0 ORDER BY paid_at DESC LIMIT 20").bind(mode).all<{id:string;shortages:string}>();
+ return json({mode,...aggregateAnalytics(rows,options),inventoryAlerts:inventoryAlerts.results.map(r=>({id:r.id,items:JSON.parse(r.shortages)}))});
+}catch(e){console.error('admin_analytics',e);return json({error:'Analytics belum dapat dimuat.'},503);}}

@@ -121,3 +121,7 @@ Area admin tersedia di `/admin`, login di `/admin/login`, dan pendaftaran di `/a
 - Katalog publik diperbarui tiap 30 detik atau saat tab kembali aktif. Checkout memakai harga dan stok server terkini. Penyimpanan memakai versi untuk menolak pembaruan dari tab lama.
 
 Terapkan migrasi `0004_clammy_magus.sql` untuk database lokal. Pengujian integrasi admin: jalankan server lokal, lalu `node tests/admin-api.mjs`. Pengujian ini membuat fixture akun/produk/pesanan hanya pada D1 lokal. Jangan jalankan terhadap produksi. Untuk lokal, isi `ADMIN_INVITE_CODE` di `.env` dan `.dev.vars`; kode untuk produksi harus berbeda.
+
+### Filter analytics admin
+
+Dashboard mendukung All-time, Daily, Weekly (Senin–Minggu), Monthly, Yearly, dan rentang tanggal inklusif dengan zona GMT+7. Filter kategori dan status berlaku pada ringkasan serta grafik garis. Barang terjual dan nilai pembelian hanya dihitung dari pembayaran terkonfirmasi; filter gagal menampilkan jumlah pesanan gagal tanpa mencatatnya sebagai penjualan. Grafik batang sukses/gagal memiliki periode Weekly/Monthly/Yearly tersendiri dan mengikuti kategori serta sumber data, sehingga kedua status tetap dapat dibandingkan. Sukses mencakup PAID/COMPLETED; gagal mencakup FAILED/EXPIRED/CANCELLED dan pembayaran pending kedaluwarsa. Dalam pengiriman mencakup PAID yang belum diselesaikan. Jam berjalan realtime; data pesanan dimuat ulang saat filter berubah atau tombol Perbarui ditekan.

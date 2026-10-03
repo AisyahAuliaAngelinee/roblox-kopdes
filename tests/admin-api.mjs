@@ -26,6 +26,11 @@ const original=(await req('/api/admin/staff')).d;const updated=original.staff.ma
 const orderData={items:[{id,name:'QA Product',category:'Sembako',quantity:120,price:9000}],amount:1080000,mode:'demo'};
 fs.writeFileSync(sqlPath,`INSERT INTO kopdes_orders(id,owner,data,status,paid_at,created_at) VALUES('${id}','local-qa','${JSON.stringify(orderData)}','PAID',${Date.now()},${Date.now()});`);execFileSync('npx',['wrangler','d1','execute','DB','--local','--config','wrangler.json','--file',sqlPath],{stdio:'ignore'});fs.unlinkSync(sqlPath);
 const analytics=(await req('/api/admin/analytics?mode=demo')).d;assert.equal(analytics.days.length,30);assert.ok(analytics.units>=120);assert.ok(analytics.summary.revenue>=1080000);assert.ok(analytics.topProducts.length<=5);assert.ok(!(await req('/api/admin/analytics?mode=xendit-test')).d.topProducts.some(p=>p.id===id));
+const daily=(await req('/api/admin/analytics?period=daily&barPeriod=yearly&category=Sembako&status=shipping')).d;assert.equal(daily.days.length,1);assert.equal(daily.statusBars.length,12);assert.ok(daily.topProducts.some(p=>p.id===id));
+const noSales=(await req('/api/admin/analytics?period=all&status=failed')).d;assert.equal(noSales.units,0);assert.equal(noSales.summary.revenue,0);
+assert.equal((await req('/api/admin/analytics?period=range&from=2026-02-30&to=2026-03-01')).r.status,400);
+assert.equal((await req('/api/admin/analytics?status=invalid')).r.status,400);
+console.log('PASS: analytics API calendar/status/category filters, yearly status bars and invalid range validation.');
 assert.equal((await req('/api/admin/invites','POST',{})).d.code.length,64);
 assert.equal((await req('/api/admin/session','DELETE')).r.status,200);assert.equal((await req('/api/admin/products')).r.status,401);
 assert.equal((await req('/api/admin/login','POST',{email,password:'wrong'})).r.status,401);
