@@ -8,6 +8,8 @@ try{
  const db=await mf.getD1Database('DB');
  const migration=await fs.readFile('drizzle/0001_chief_warhawk.sql','utf8');for(const s of migration.split('--> statement-breakpoint'))await db.exec(s.replace(/\n/g,' '));
  await db.exec((await fs.readFile('drizzle/0002_sad_marvel_apes.sql','utf8')).replace(/\n/g,' '));
+ await db.exec("CREATE TABLE kopdes_products(id TEXT PRIMARY KEY,data TEXT NOT NULL,version INTEGER NOT NULL DEFAULT 0,updated_at INTEGER NOT NULL)");
+ await db.prepare('INSERT INTO kopdes_products VALUES(?,?,0,0)').bind('telur',JSON.stringify({stock:100})).run();
  const data={mode:'demo',email:null,items:[{id:'telur',name:'Telur',price:28000,quantity:2}],amount:56000,shipping:0,address:{city:'Jakarta'}};
  await insertOrder(db,'a','order-a',data);await insertOrder(db,'b','order-b',data);
  assert.equal(await readOrder(db,'b','order-a'),null);assert.equal((await listOrders(db,'a')).length,1);
@@ -27,6 +29,8 @@ try{
  const {activeOrderCount,searchOrders,expireDemoOrders,payDemoOrder}=await import('../db/order-store.ts');
  const db=await mf2.getD1Database('DB');
  for(const path of ['drizzle/0001_chief_warhawk.sql','drizzle/0002_sad_marvel_apes.sql'])for(const s of (await fs.readFile(path,'utf8')).split('--> statement-breakpoint'))await db.exec(s.replace(/\n/g,' '));
+ await db.exec("CREATE TABLE kopdes_products(id TEXT PRIMARY KEY,data TEXT NOT NULL,version INTEGER NOT NULL DEFAULT 0,updated_at INTEGER NOT NULL)");
+ await db.prepare('INSERT INTO kopdes_products VALUES(?,?,0,0)').bind('telur',JSON.stringify({stock:100})).run();
  const data={mode:'demo',items:[{id:'telur',name:'Telur',price:28000,quantity:1}],amount:28000,shipping:0,address:{recipient:'Penerima Test'},deliveryMethod:'express'};
  for(let i=0;i<52;i++)await insertOrder(db,'a','express-'+i,data);
  await insertOrder(db,'b','private-order',data);

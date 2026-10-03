@@ -8,7 +8,7 @@ type Result = {
 
 // Minimal D1Database lookalike that talks to the Cloudflare D1 REST API, so the
 // app can run outside Workers (e.g. Vercel). Only the methods the stores use.
-async function query(sql: string, params: unknown[]): Promise<Result> {
+async function queryResults(payload: {sql: string; params: unknown[]} | {batch: {sql: string; params: unknown[]}[]}): Promise<Result[]> {
 	const {
 		CLOUDFLARE_ACCOUNT_ID: account,
 		CLOUDFLARE_D1_DATABASE_ID: database,
@@ -22,7 +22,7 @@ async function query(sql: string, params: unknown[]): Promise<Result> {
 				Authorization: `Bearer ${token}`,
 				"Content-Type": "application/json",
 			},
-			body: JSON.stringify({ sql, params }),
+			body: JSON.stringify(payload),
 			cache: "no-store",
 		},
 	);
@@ -31,12 +31,16 @@ async function query(sql: string, params: unknown[]): Promise<Result> {
 		result?: Result[];
 		errors?: { message: string }[];
 	};
-	if (!response.ok || !body.success || !body.result?.[0])
+	if (!response.ok || !body.success || !body.result?.length || body.result.some(r => !r.success))
 		throw new Error(
 			"D1 REST error: " +
 				(body.errors?.map((e) => e.message).join("; ") || response.status),
 		);
-	return body.result[0];
+	return body.result;
+}
+
+async function query(sql: string, params: unknown[]): Promise<Result> {
+ return (await queryResults({sql,params}))[0];
 }
 
 class RestStatement {
@@ -64,11 +68,13 @@ class RestStatement {
 
 const restDb = {
 	prepare: (sql: string) => new RestStatement(sql),
-	// Sequential, not transactional; the stores guard each statement in SQL.
+	// Keep all statements in one D1 batch request for atomic payment and inventory updates.
+	// https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/query/
 	async batch(statements: RestStatement[]) {
-		const out: Result[] = [];
-		for (const s of statements) out.push(await s.run());
-		return out;
+		if (!statements.length) return [];
+		const result = await queryResults({batch: statements.map(s => ({sql:s.sql,params:s.params}))});
+		if(result.length!==statements.length) throw new Error("Incomplete D1 batch response");
+		return result;
 	},
 };
 

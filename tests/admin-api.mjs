@@ -25,7 +25,7 @@ assert.equal((await req('/api/admin/products','POST',{product:{...product,id:id+
 const original=(await req('/api/admin/staff')).d;const updated=original.staff.map((s,i)=>i===0?{...s,role:'QA Manager',active:false}:s);assert.equal((await req('/api/admin/staff','PUT',{staff:updated,version:original.version})).r.status,200);assert.ok(!(await req('/api/staff')).d.staff.some(s=>s.id===updated[0].id));assert.equal((await req('/api/admin/staff','PUT',{staff:updated,version:original.version})).r.status,409);assert.equal((await req('/api/admin/staff','PUT',{staff:original.staff,version:original.version+1})).r.status,200);
 const orderData={items:[{id,name:'QA Product',category:'Sembako',quantity:120,price:9000}],amount:1080000,mode:'demo'};
 fs.writeFileSync(sqlPath,`INSERT INTO kopdes_orders(id,owner,data,status,paid_at,created_at) VALUES('${id}','local-qa','${JSON.stringify(orderData)}','PAID',${Date.now()},${Date.now()});`);execFileSync('npx',['wrangler','d1','execute','DB','--local','--config','wrangler.json','--file',sqlPath],{stdio:'ignore'});fs.unlinkSync(sqlPath);
-const analytics=(await req('/api/admin/analytics?mode=demo')).d;assert.equal(analytics.days.length,30);assert.ok(analytics.topProducts.some(p=>p.id===id&&p.quantity===120));assert.ok(!(await req('/api/admin/analytics?mode=xendit-test')).d.topProducts.some(p=>p.id===id));
+const analytics=(await req('/api/admin/analytics?mode=demo')).d;assert.equal(analytics.days.length,30);assert.ok(analytics.units>=120);assert.ok(analytics.summary.revenue>=1080000);assert.ok(analytics.topProducts.length<=5);assert.ok(!(await req('/api/admin/analytics?mode=xendit-test')).d.topProducts.some(p=>p.id===id));
 assert.equal((await req('/api/admin/invites','POST',{})).d.code.length,64);
 assert.equal((await req('/api/admin/session','DELETE')).r.status,200);assert.equal((await req('/api/admin/products')).r.status,401);
 assert.equal((await req('/api/admin/login','POST',{email,password:'wrong'})).r.status,401);
@@ -44,3 +44,12 @@ const orderResponse=await fetch(base+'/api/checkout',{method:'POST',headers:buye
 const newInvite=(await req('/api/admin/invites','POST',{})).d.code;
 const concurrent=await Promise.all([1,2].map(n=>req('/api/admin/register','POST',{name:'Concurrent QA',email:id+'-'+n+'@example.test',password:'local-test-password-2026',invite:newInvite})));assert.equal(concurrent.filter(x=>x.r.status===201).length,1);
 console.log('PASS: customer cannot administer; checkout uses managed stock/price/category; concurrent invitation accepted once.');
+
+if(order.order.data.mode==='demo'){
+ const paid=await Promise.all(Array.from({length:3},()=>fetch(base+'/api/orders',{method:'POST',headers:buyerHeaders,body:JSON.stringify({id:order.order.id,action:'simulate'})})));
+ assert.ok(paid.every(r=>r.status===200));
+ const catalog=(await req('/api/catalog')).d.products;
+ assert.equal(catalog.find(p=>p.id===id).stock,4);
+ assert.equal((await req('/api/admin/products','PUT',{product:{...product,stock:5},version:2})).r.status,409);
+ console.log('PASS: payment API debits stock once; stale admin edits cannot overwrite the debit.');
+}

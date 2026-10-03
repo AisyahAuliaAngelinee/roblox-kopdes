@@ -1,5 +1,5 @@
 import type {Address} from './profile';
-export type OrderData={mode:'demo'|'xendit-test';email:string|null;items:{id:string;name:string;category?:string;price:number;quantity:number}[];amount:number;address:Address;shipping:number;paymentMethod?:'qris'|'gopay'|'bank';bankCode?:string;note?:string;expiresAt?:number;deliveryMethod?:'express'|'regular'};
+export type OrderData={stockDeductedAt?:number;inventoryShortages?:{id:string;quantity:number;shortfall:number}[];mode:'demo'|'xendit-test';email:string|null;items:{id:string;name:string;category?:string;price:number;quantity:number}[];amount:number;address:Address;shipping:number;paymentMethod?:'qris'|'gopay'|'bank';bankCode?:string;note?:string;expiresAt?:number;deliveryMethod?:'express'|'regular'};
 export type Order={id:string;status:string;createdAt:number;paidAt:number|null;completedAt:number|null;invoiceId:string|null;url:string|null;data:OrderData};
 export const deliveryStages=['Barang sedang di packing','Barang sedang di antar dalam perjalanan','Barang sampai di tujuan'];
 export function deliveryTiming(method?:string){return method==='express'?{label:'Express',packing:15000,total:60000}:{label:'Regular',packing:30000,total:120000};}

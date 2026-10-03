@@ -16,7 +16,7 @@ export async function POST(request:Request){
  const {id,action}=await request.json() as {id:unknown;action:string};if(typeof id!=='string'||!['simulate','refresh','complete'].includes(action))return json({error:'Permintaan tidak valid.'},400);
  const db=getDb();await expireDemoOrders(db,owner);const order=await readOrder(db,owner,id);if(!order)return json({error:'Pesanan tidak ditemukan.'},404);
  if(action==='complete'){if(order.status!=='COMPLETED'){if(order.status!=='PAID'||order.paidAt===null||Date.now()-order.paidAt<deliveryTiming(order.data.deliveryMethod).total)return json({error:'Pesanan hanya dapat diselesaikan setelah sampai di tujuan.'},409);await completeOrder(db,owner,id,Date.now(),deliveryTiming(order.data.deliveryMethod).total);}}
- else if(action==='simulate'){if(order.data.mode!=='demo')return json({error:'Pembayaran Xendit harus diverifikasi melalui Xendit.'},400);await payDemoOrder(db,owner,id,Date.now());await expireDemoOrders(db,owner);}
+ else if(action==='simulate'){if(order.data.mode!=='demo')return json({error:'Pembayaran Xendit harus diverifikasi melalui Xendit.'},400);const paid=await payDemoOrder(db,owner,id,Date.now());await expireDemoOrders(db,owner);if(!paid&&(await readOrder(db,owner,id))?.status==='PENDING')return json({error:'Stok barang tidak lagi mencukupi. Perbarui keranjang sebelum membuat pesanan baru.'},409);}
  else if(order.data.mode==='xendit-test'&&order.status==='PENDING'){
  const secret=process.env.XENDIT_SECRET_KEY;if(!secret?.startsWith('xnd_development_')||!order.invoiceId)return json({error:'Xendit Test belum tersedia.'},503);
  const inv=await new Xendit({secretKey:secret}).Invoice.getInvoiceById({invoiceId:order.invoiceId});
