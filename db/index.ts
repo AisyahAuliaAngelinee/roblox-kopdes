@@ -85,6 +85,7 @@ export function getDb(): D1Database {
 		process.env.CLOUDFLARE_ACCOUNT_ID
 	)
 		return restDb as unknown as D1Database;
+	if (process.env.VERCEL) throw new Error("D1_CONFIGURATION_MISSING: set CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_D1_DATABASE_ID and CLOUDFLARE_API_TOKEN on Vercel");
 	const { env } = getCloudflareContext();
 	const db = (env as unknown as { DB?: D1Database }).DB;
 	if (!db) throw new Error("Database unavailable");

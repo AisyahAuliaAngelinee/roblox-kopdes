@@ -29,3 +29,14 @@ Jika hanya data tamu yang disimpan sebelum login, data itu ada di localStorage d
 - https://developers.google.com/identity/openid-connect/openid-connect
 - https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/get/
 - https://vercel.com/docs/environment-variables
+
+## Login berhasil tetapi profil gagal dimuat / wishlist terkunci
+
+Periksa Vercel → Logs untuk request `/api/profile`. Kode mencatat kategori tanpa isi profil atau credential:
+
+- `database_configuration_missing`: tiga variabel D1 belum lengkap pada deployment aktif.
+- `database_schema_missing`: koneksi ada tetapi tabel belum dibuat.
+- `database_connection_or_permission_failed`: periksa token, Account ID, Database ID dan izin.
+- `database_or_profile_validation_failed`: periksa schema profil atau koneksi lainnya.
+
+Untuk database D1 **baru**, buka Console database Cloudflare dan jalankan isi [d1-initial-schema.sql](d1-initial-schema.sql). Berkas ini hanya membuat tabel/index; tidak memindahkan data staging. Untuk database lama gunakan migrasi berurutan dari `drizzle`, bukan snapshot ini. Setelah env benar dan tabel siap, Redeploy di Vercel lalu klik Coba lagi pada panel akun.

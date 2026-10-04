@@ -11,8 +11,8 @@ export async function GET(request: Request) {
 			profile: row ? profileSchema.parse(JSON.parse(row.data)) : emptyProfile,
 			version: row?.version ?? 0,
 		});
-	} catch {
-		console.error("profile_read_unavailable");
+	} catch (error) {
+		logProfileFailure("read", error);
 		return json({ error: "Data akun belum dapat dimuat. Coba kembali." }, 503);
 	}
 }
@@ -50,11 +50,21 @@ export async function PUT(request: Request) {
 				409,
 			);
 		return json({ profile: parsed.data, version });
-	} catch {
-		console.error("profile_write_unavailable");
+	} catch (error) {
+		logProfileFailure("write", error);
 		return json(
 			{ error: "Belum berhasil menyimpan. Data sebelumnya tetap aman." },
 			503,
 		);
 	}
+}
+
+// Log only a diagnostic category; never log profile data, cookies or API credentials.
+function logProfileFailure(operation: string, error: unknown) {
+ const message = error instanceof Error ? error.message : '';
+ const reason = message.includes('D1_CONFIGURATION_MISSING') ? 'database_configuration_missing'
+  : message.includes('no such table') ? 'database_schema_missing'
+  : message.includes('D1 REST error') ? 'database_connection_or_permission_failed'
+  : 'database_or_profile_validation_failed';
+ console.error('profile_' + operation + '_unavailable', {reason});
 }
