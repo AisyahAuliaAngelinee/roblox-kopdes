@@ -125,3 +125,5 @@ Terapkan migrasi `0004_clammy_magus.sql` untuk database lokal. Pengujian integra
 ### Filter analytics admin
 
 Dashboard mendukung All-time, Daily, Weekly (Senin–Minggu), Monthly, Yearly, dan rentang tanggal inklusif dengan zona GMT+7. Filter kategori dan status berlaku pada ringkasan serta grafik garis. Barang terjual dan nilai pembelian hanya dihitung dari pembayaran terkonfirmasi; filter gagal menampilkan jumlah pesanan gagal tanpa mencatatnya sebagai penjualan. Grafik batang sukses/gagal memiliki periode Weekly/Monthly/Yearly tersendiri dan mengikuti kategori serta sumber data, sehingga kedua status tetap dapat dibandingkan. Sukses mencakup PAID/COMPLETED; gagal mencakup FAILED/EXPIRED/CANCELLED dan pembayaran pending kedaluwarsa. Dalam pengiriman mencakup PAID yang belum diselesaikan. Jam berjalan realtime; data pesanan dimuat ulang saat filter berubah atau tombol Perbarui ditekan.
+
+Konfigurasi data akun untuk domain Vercel dan perbedaan dengan staging: [panduan Vercel dan migrasi data](docs/vercel-data.md).
